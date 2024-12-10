@@ -132,6 +132,24 @@ def change_password() -> Response:
         return make_response(jsonify({'status': 'success', 'username': username}), 200)
     except:
         return make_response(jsonify({"error": "An error occurred while updating the password"}), 500)
+      
+@app.route('/api/compare_password', methods=['PUT'])
+def compare_password() -> Response:
+    app.logger.info('Checking login credentials')
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        if not User.query.filter_by(username=username).first():
+            return make_response(jsonify({'error': 'Invalid username, user does not exist'}), 400) 
+        if (User.check_password(username, password)):
+            return make_response(jsonify({'status': 'success', 'username': username}), 200)
+        else:
+            return make_response(jsonify({'error': 'Incorrect password'}), 400)
+    except:
+        return make_response(jsonify({"error": "An error occurred while checking passwords"}), 500)
+
+
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -186,7 +204,7 @@ def add_favorite() -> Response:
     Route to add a new location to the favorites dictionary.
 
     Expected JSON Input:
-        - location (str): the location whose weather will be retrieved.
+        - location (str): the location whose weather will be retrieved and added to favorites.
 
     Returns:
         JSON response indicating the success of the location addition.
@@ -222,4 +240,142 @@ def add_favorite() -> Response:
     
     except Exception as e:
         app.logger.error("Failed to add favorite: %s", str(e))
+        return make_response(jsonify({'error': str(e)}), 500)
+
+@app.route('/api/get-favorite-weather/<str:location>', methods = ['GET'])
+def get_favorite_weather(location: str) -> Response:
+    """
+    Route to get the weather for a favorite location.
+
+    Path Parameter:
+        - location (str): the location whose weather will be retrieved.
+
+    Returns:
+        JSON response with the location's weather details.
+    Raises:
+        400 error if the input validation fails.
+        500 error if there is an issue retrieving the weather.
+    """
+
+    try:
+        app.logger.info(f"Retrieving weather for location: {location}")
+
+        if not location:
+            return make_response(jsonify({'error': 'Location is required'}), 400)
+        
+        weather = favorites_manager.get_favorite_weather(location)
+        return make_response(jsonify({'status': 'success', 'weather': weather}), 200)
+    except Exception as e:
+        app.logger.error(f"Error retrieving weather for location: {e}")
+        return make_response(jsonify({'error': str(e)}), 500)
+    
+@app.route('/api/get-all-favorites-current-weather', methods = ['GET'])
+def get_all_favorites_current_weather() -> Response:
+    """
+    Route to get the current temperature for all the locations in the favorites dictionary.
+
+    Returns:
+        JSON response with a list of the locations and their current temperature
+
+    Raises:
+        500 error if there is an issue retrieving the weather.
+    """
+    try:
+        app.logger.info(f"Retrieving temperatures for all locations in favorites.")
+
+        weather = favorites_manager.get_all_favorites_current_weather()
+        return make_response(jsonify({'status': 'success', 'favorite weather': weather}))
+    except Exception as e:
+        app.logger.error("Error retrieving temperatures for all locations in favorites")
+        return make_response(jsonify({'error': str(e)}), 500)
+    
+@app.route('/api/get-favorite-historical/<str:location>', methods = ['GET'])
+def get_favorite_historical(location: str) -> Response:
+    """
+    Route to get the historical weather for a favorite location.
+
+    Path Paramter:
+        location (str): the location whose historical weather will be retrieved.
+    Returns:
+        JSON response with a dictionary of the historical weather for a favorite location.
+
+    Raises:
+        400 error if input validation fails.
+        500 error if there is an issue retrieving the weather.
+    """
+    try:
+        app.logger.info(f"Retrieving the historical weather for location: {location}")
+
+        if not location:
+            return make_response(jsonify({'error': 'Location is required'}), 400)
+        
+        weather = favorites_manager.get_favorite_historical(location)
+        return make_response(jsonify({'status': 'success', 'historical weather': weather}))
+    except Exception as e:
+        app.logger.error("Error retrieving temperatures for all locations in favorites")
+        return make_response(jsonify({'error': str(e)}), 500)
+
+@app.route('/api/get-favorites-forecast/<str:location>', methods = ['GET'])
+def get_favorites_forecast(location):
+    """
+    Route to get the 5 day forecast for a favorite location.
+
+    Path Paramter:
+        location (str): the location whose forecast will be retrieved.
+    Returns:
+        JSON response with a dictionary of the average temperature for each day.
+
+    Raises:
+        400 error if input validation fails.
+        500 error if there is an issue retrieving the weather.
+    """
+    try:
+        app.logger.info(f"Retrieving the 5 day forecast for location: {location}")
+
+        if not location:
+            return make_response(jsonify({'error': 'Location is required'}), 400)
+        
+        weather = favorites_manager.get_favorites_forecast(location)
+        return make_response(jsonify({'status': 'success', 'forecast': weather}))
+    except Exception as e:
+        app.logger.error(f"Error retrieving forecast fore location: {location}")
+        return make_response(jsonify({'error': str(e)}), 500)
+
+@app.route('/api/clear-favorites', methods=['DELETE'])
+def clear_favorites() -> Response:
+    """
+    Route to clear all favorites.
+
+    Returns:
+        JSON response indicating success of the operation or error message.
+
+    Raises: 
+        500 error if there is an error clearing favorites.
+    """
+    try:
+        app.logger.info("Clearing list of favorites.")
+        favorites_manager.clear_favorites()
+        return make_response(jsonify({'status': 'success'}), 200)
+    except Exception as e:
+        app.logger.error(f"Error clearing favorites list: {e}")
+        return make_response(jsonify({'error': str(e)}), 500)
+    
+@app.route('/api/get-all-favorites', methods = ['GET'])
+def get_all_favorites() -> Response:
+    """
+    Route to get the list of all favorite locations saved.
+
+    Returns:
+        JSON response with a list of all favorite locations.
+
+    Raises:
+        500 error if there is an issue retrieving the list.
+    """
+    try:
+        app.logger.info(f"Retrieving all locations in favorites.")
+
+        fav_list = favorites_manager.get_all_favorites()
+        return make_response(jsonify({'status': 'success', 'favorite list': fav_list}))
+    except Exception as e:
+        app.logger.error("Error retrieving list of locations in favorites.")
         return make_response(jsonify({'error': str(e)}), 500)
